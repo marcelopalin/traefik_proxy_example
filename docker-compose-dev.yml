@@ -3,11 +3,20 @@ services:
     image: traefik:v2.9
     command:
       - "--configFile=/etc/traefik/traefik.toml"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--certificatesresolvers.myresolver.acme.email=admin@mail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=acme.json"
+      - "--certificatesresolvers.myresolver.acme.tlsChallenge=true"
     volumes:
       - "./traefik.dev.toml:/etc/traefik/traefik.toml"
       - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./cert:/cert"
     ports:
       - "80:80"
+      - "443:443"
       - "8080:8080"
     networks:
       - web
@@ -17,13 +26,12 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./app1:/app
-    ports:
-      - "8000:8000"
     labels:
-      - "traefik.enable=true" 
-      - "traefik.http.routers.app1.rule=Host(`app1.localhost`)"
+      - "traefik.enable=true"
+      - "traefik.http.routers.app1.rule=Host(`app1.docker.localhost`)"
+      - "traefik.http.routers.app1.entrypoints=websecure"
+      - "traefik.http.routers.app1.tls.certresolver=myresolver"
       - "traefik.http.services.app1.loadbalancer.server.port=8000"
-      - "traefik.http.routers.app1.entrypoints=web"
     networks:
       - web
 
@@ -32,12 +40,11 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8001
     volumes:
       - ./app2:/app
-    ports:
-      - "8001:8001"
     labels:
-      - "traefik.enable=true" 
-      - "traefik.http.routers.app2.rule=Host(`app2.localhost`)"
-      - "traefik.http.routers.app2.entrypoints=web"
+      - "traefik.enable=true"
+      - "traefik.http.routers.app2.rule=Host(`app2.docker.localhost`)"
+      - "traefik.http.routers.app2.entrypoints=websecure"
+      - "traefik.http.routers.app2.tls.certresolver=myresolver"
       - "traefik.http.services.app2.loadbalancer.server.port=8001"
     networks:
       - web

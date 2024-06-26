@@ -1,6 +1,8 @@
 [entryPoints]
   [entryPoints.web]
     address = ":80"
+  [entryPoints.websecure]
+    address = ":443"
 
 [api]
   insecure = true
@@ -15,3 +17,9 @@
   [providers.docker]
     exposedByDefault = false
     network = "web"
+
+[certificatesResolvers.myresolver.acme]
+  email = "admin@mail.com"
+  storage = "acme.json"
+  [certificatesResolvers.myresolver.acme.tlsChallenge]
+    entryPoint = "websecure"
