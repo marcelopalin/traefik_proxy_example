@@ -304,29 +304,37 @@ Aqui está como você pode adicionar essas configurações ao seu arquivo traefi
 A partir do docker 26+ não é preciso mais colocar a versão do `docker-compose.yml`
 
 ```yaml
-services:
+networks:
+  web:
+    external: true
 
+services:
   traefik:
     image: traefik:v2.9
     command:
-      - "--configFile=/etc/traefik/traefik.toml"
-      - "--entryPoints.web.address=:80"
-      - "--entryPoints.websecure.address=:443"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--certificatesresolvers.myresolver.acme.email=admin@mail.com"
-      - "--certificatesresolvers.myresolver.acme.storage=acme.json"
-      - "--certificatesresolvers.myresolver.acme.tlsChallenge=true"
     volumes:
-      - "./traefik.dev.toml:/etc/traefik/traefik.toml"
+      - "./traefik.dev.toml:/etc/traefik/traefik.toml:ro"
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./cert:/cert"
+      - "./cert:/cert:ro"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.dashboard.rule=Host(`painel.docker.localhost`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
+
 
   app1:
     build: ./app1
@@ -335,6 +343,7 @@ services:
       - ./app1:/app
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.app1.rule=Host(`app1.docker.localhost`)"
       - "traefik.http.routers.app1.entrypoints=websecure"
       - "traefik.http.routers.app1.tls.certresolver=myresolver"
@@ -349,79 +358,89 @@ services:
       - ./app2:/app
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.app2.rule=Host(`app2.docker.localhost`)"
       - "traefik.http.routers.app2.entrypoints=websecure"
       - "traefik.http.routers.app2.tls.certresolver=myresolver"
       - "traefik.http.services.app2.loadbalancer.server.port=8001"
     networks:
       - web
-
-networks:
-  web:
-    driver: bridge
 ```
 
 ### Detalhando as Configurações do `docker-compose-dev.yml`
 
-Este arquivo `docker-compose-dev.yml` define a configuração dos serviços Docker para o nosso 
-ambiente de desenvolvimento. Vamos detalhar cada parte para que um iniciante possa entender.
+Vamos detalhar as configurações fornecidas no arquivo `docker-compose.yml`:
 
-#### Serviços
+### Redes
 
-##### 1. Traefik
-
-Traefik é um proxy reverso que gerencia e roteia requisições para os serviços da sua aplicação.
+#### networks
 
 ```yaml
+networks:
+  web:
+    external: true
+```
+
+- **web**: Esta seção define uma rede chamada "web" que é externa ao `docker-compose.yml`. Isso significa que a rede já deve existir no Docker antes de executar o `docker-compose`. É utilizada para conectar os serviços do `docker-compose` a outras redes ou containers que não fazem parte desta configuração.
+
+### Serviços
+
+#### traefik
+
+```yaml
+services:
   traefik:
     image: traefik:v2.9
     command:
-      - "--configFile=/etc/traefik/traefik.toml"
-      - "--entryPoints.web.address=:80"
-      - "--entryPoints.websecure.address=:443"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--certificatesresolvers.myresolver.acme.email=admin@mail.com"
-      - "--certificatesresolvers.myresolver.acme.storage=acme.json"
-      - "--certificatesresolvers.myresolver.acme.tlsChallenge=true"
     volumes:
-      - "./traefik.dev.toml:/etc/traefik/traefik.toml"
+      - "./traefik.dev.toml:/etc/traefik/traefik.toml:ro"
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./cert:/cert"
+      - "./cert:/cert:ro"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.dashboard.rule=Host(`painel.docker.localhost`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
 ```
 
-- **image**: Define a imagem do Docker a ser usada. Aqui estamos usando `traefik:v2.9`.
-- **command**: Passa parâmetros de configuração para o Traefik.
-  - `--configFile=/etc/traefik/traefik.toml`: Especifica o arquivo de configuração do Traefik.
-  - `--entryPoints.web.address=:80`: Define o ponto de entrada para HTTP na porta 80.
-  - `--entryPoints.websecure.address=:443`: Define o ponto de entrada para HTTPS na porta 443.
-  - `--providers.docker=true`: Habilita o provedor Docker para que Traefik possa detectar automaticamente os serviços definidos no Docker Compose.
-  - `--providers.docker.exposedbydefault=false`: Garante que os serviços não sejam expostos por padrão.
-  - `--certificatesresolvers.myresolver.acme.email=admin@mail.com`: Define o email para o resolver de certificados ACME (usado para obter certificados SSL).
-  - `--certificatesresolvers.myresolver.acme.storage=acme.json`: Especifica onde os certificados obtidos serão armazenados.
-  - `--certificatesresolvers.myresolver.acme.tlsChallenge=true`: Habilita o desafio TLS para a obtenção de certificados SSL.
-- **volumes**: Monta volumes do host para o contêiner.
-  - `./traefik.dev.toml:/etc/traefik/traefik.toml`: Monta o arquivo de configuração do Traefik.
-  - `/var/run/docker.sock:/var/run/docker.sock`: Permite que Traefik acesse o Docker daemon para descobrir serviços.
-  - `./cert:/cert`: Monta o diretório onde os certificados SSL estão armazenados.
-- **ports**: Mapeia as portas do contêiner para o host.
-  - `80:80`: Porta HTTP.
-  - `443:443`: Porta HTTPS.
-  - `8080:8080`: Porta do painel de administração do Traefik.
-- **networks**: Define as redes em que o serviço estará disponível.
+- **image**: Define a imagem Docker a ser usada para o serviço, neste caso, `traefik:v2.9`.
+- **command**: Define comandos específicos a serem executados no container.
+  - `--api.dashboard=true`: Ativa o dashboard da API do Traefik.
+  - `--providers.docker=true`: Ativa o provedor Docker para Traefik, permitindo que ele descubra containers Docker automaticamente.
+  - `--providers.docker.exposedbydefault=false`: Garante que apenas containers explicitamente configurados serão expostos pelo Traefik.
+- **volumes**:
+  - `./traefik.dev.toml:/etc/traefik/traefik.toml:ro`: Monta o arquivo `traefik.dev.toml` na localização especificada dentro do container.
+  - `/var/run/docker.sock:/var/run/docker.sock`: Permite que o Traefik se comunique com o Docker para descobrir containers.
+  - `./cert:/cert:ro`: Monta o diretório `cert` com certificados SSL.
+- **ports**: Mapeia portas do container para a máquina host.
+  - `80:80`: HTTP
+  - `443:443`: HTTPS
+  - `8080:8080`: Dashboard do Traefik
+- **networks**: Conecta o serviço à rede "web".
+- **labels**: Configurações específicas do Traefik:
+  - `traefik.enable=true`: Ativa o Traefik para este serviço.
+  - `traefik.docker.network=web`: Define a rede Docker a ser usada pelo Traefik.
+  - `traefik.http.routers.dashboard.rule=Host(`painel.docker.localhost`)`: Define a regra de roteamento para acessar o dashboard.
+  - `traefik.http.routers.dashboard.entrypoints=websecure`: Define o ponto de entrada (HTTPS) para o dashboard.
+  - `traefik.http.routers.dashboard.tls.certresolver=myresolver`: Configura o resolver de certificados TLS.
+  - `traefik.http.routers.dashboard.service=api@internal`: Define o serviço interno da API do Traefik.
+  - `traefik.http.routers.dashboard.middlewares=auth`: Aplica o middleware de autenticação.
+  - `traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/`: Define o usuário e a senha para autenticação básica.
 
-**Acesso ao Painel do Traefik:**
-Você poderá acessar o painel de administração do Traefik em [http://localhost:8080](http://localhost:8080).
-
-##### 2. app1
-
-Este serviço define uma aplicação FastAPI rodando no contêiner `app1`.
+#### app1
 
 ```yaml
   app1:
@@ -431,6 +450,7 @@ Este serviço define uma aplicação FastAPI rodando no contêiner `app1`.
       - ./app1:/app
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.app1.rule=Host(`app1.docker.localhost`)"
       - "traefik.http.routers.app1.entrypoints=websecure"
       - "traefik.http.routers.app1.tls.certresolver=myresolver"
@@ -439,21 +459,21 @@ Este serviço define uma aplicação FastAPI rodando no contêiner `app1`.
       - web
 ```
 
-- **build**: Define o diretório onde o Dockerfile está localizado.
-- **command**: Especifica o comando para iniciar o servidor Uvicorn, que serve a aplicação FastAPI.
-- **volumes**: Monta volumes do host para o contêiner.
-  - `./app1:/app`: Monta o diretório `app1` do host no contêiner.
-- **labels**: Define labels específicas para o Traefik configurar o roteamento.
-  - `"traefik.enable=true"`: Habilita este serviço para ser gerenciado pelo Traefik.
-  - `"traefik.http.routers.app1.rule=Host(`app1.docker.localhost`)`": Define a regra de roteamento para este serviço, acessível pelo host `app1.docker.localhost`.
-  - `"traefik.http.routers.app1.entrypoints=websecure"`: Define o ponto de entrada (HTTPS) para este serviço.
-  - `"traefik.http.routers.app1.tls.certresolver=myresolver"`: Usa o resolver de certificados definido anteriormente.
-  - `"traefik.http.services.app1.loadbalancer.server.port=8000"`: Define a porta interna do contêiner onde o serviço está rodando.
-- **networks**: Define as redes em que o serviço estará disponível.
+- **build**: Define o diretório de construção do Dockerfile.
+- **command**: Comando a ser executado no container.
+  - `uvicorn main:app --host 0.0.0.0 --port 8000`: Inicia a aplicação FastAPI.
+- **volumes**: Monta o diretório `app1` no container.
+  - `./app1:/app`
+- **labels**: Configurações específicas do Traefik para o serviço `app1`.
+  - `traefik.enable=true`: Ativa o Traefik para este serviço.
+  - `traefik.docker.network=web`: Define a rede Docker a ser usada pelo Traefik.
+  - `traefik.http.routers.app1.rule=Host(`app1.docker.localhost`)`: Define a regra de roteamento para `app1`.
+  - `traefik.http.routers.app1.entrypoints=websecure`: Define o ponto de entrada (HTTPS) para `app1`.
+  - `traefik.http.routers.app1.tls.certresolver=myresolver`: Configura o resolver de certificados TLS.
+  - `traefik.http.services.app1.loadbalancer.server.port=8000`: Define a porta do serviço a ser utilizada pelo Traefik.
+- **networks**: Conecta o serviço à rede "web".
 
-##### 3. app2
-
-Este serviço é semelhante ao `app1`, mas para a aplicação `app2`.
+#### app2
 
 ```yaml
   app2:
@@ -463,6 +483,7 @@ Este serviço é semelhante ao `app1`, mas para a aplicação `app2`.
       - ./app2:/app
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.app2.rule=Host(`app2.docker.localhost`)"
       - "traefik.http.routers.app2.entrypoints=websecure"
       - "traefik.http.routers.app2.tls.certresolver=myresolver"
@@ -471,25 +492,25 @@ Este serviço é semelhante ao `app1`, mas para a aplicação `app2`.
       - web
 ```
 
-### Redes
+- **build**: Define o diretório de construção do Dockerfile.
+- **command**: Comando a ser executado no container.
+  - `uvicorn main:app --host 0.0.0.0 --port 8001`: Inicia a aplicação FastAPI.
+- **volumes**: Monta o diretório `app2` no container.
+  - `./app2:/app`
+- **labels**: Configurações específicas do Traefik para o serviço `app2`.
+  - `traefik.enable=true`: Ativa o Traefik para este serviço.
+  - `traefik.docker.network=web`: Define a rede Docker a ser usada pelo Traefik.
+  - `traefik.http.routers.app2.rule=Host(`app2.docker.localhost`)`: Define a regra de roteamento para `app2`.
+  - `traefik.http.routers.app2.entrypoints=websecure`: Define o ponto de entrada (HTTPS) para `app2`.
+  - `traefik.http.routers.app2.tls.certresolver=myresolver`: Configura o resolver de certificados TLS.
+  - `traefik.http.services.app2.loadbalancer.server.port=8001`: Define a porta do serviço a ser utilizada pelo Traefik.
+- **networks**: Conecta o serviço à rede "web".
 
-As redes são necessárias para que os contêineres possam se comunicar entre si e com o Traefik.
+### Resumo
 
-```yaml
-networks:
-  web:
-    driver: bridge
-```
-
-- **web**: Define uma rede bridge padrão para permitir a comunicação entre os serviços.
-
-Em suma, este arquivo `docker-compose-dev.yml` configura três serviços:
-
-1. **Traefik**: Gerencia o roteamento e o proxy reverso, expondo os serviços através de HTTP e HTTPS. O painel de administração pode ser acessado em [http://localhost:8080](http://localhost:8080).
-2. **app1**: Uma aplicação FastAPI acessível em `https://app1.docker.localhost`.
-3. **app2**: Outra aplicação FastAPI acessível em `https://app2.docker.localhost`.
-
-Com esta configuração, você pode simular um ambiente de produção localmente, utilizando HTTPS e gerenciando múltiplos serviços com Traefik.
+- **Rede Externa**: O Traefik e os aplicativos `app1` e `app2` estão conectados a uma rede externa chamada "web".
+- **Traefik**: Configurado para atuar como um proxy reverso com dashboard habilitado, TLS e autenticação básica.
+- **Aplicativos**: `app1` e `app2` são serviços FastAPI que são expostos via HTTPS utilizando Traefik como proxy reverso.
 
 
 ### Configurar o Arquivo `hosts`
@@ -522,7 +543,19 @@ docker-compose -f docker-compose-dev.yml up -d --build
 
 - Abra o navegador e vá para `https://app1.docker.localhost` para acessar o serviço `app1`.
 - Abra o navegador e vá para `https://app2.docker.localhost` para acessar o serviço `app2`.
-- Abra o navegador e vá para `http://localhost:8080` para acessar o painel do Traefik.
+- Abra o navegador e vá para `https://painel.docker.localhost` para acessar o painel do Traefik.
+
+A senha definida foi: `admin` `teste`
+Para alterar a senha utilize o comando:
+```s
+htpasswd -nb admin minhasenha
+admin:$apr1$iAOUJD88$yh.d2XU2A3UKOj/2DoOjw/
+```
+Neste exemplo, basta copiar a linha `admin:$apr1$iAOUJD88$yh.d2XU2A3UKOj/2DoOjw/` no arquivo 
+`docker-compose-dev.yml`
+
+E sua nova senha gerada será `minhasenha`.
+
 
 ### Conclusão do Ambiente de Desenvolvimento
 
