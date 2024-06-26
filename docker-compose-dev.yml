@@ -1,3 +1,5 @@
+version: '3.8'
+
 networks:
   web:
     external: true
@@ -6,7 +8,7 @@ services:
   traefik:
     image: traefik:v2.9
     command:
-      - "--api.insecure=true"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
     volumes:
@@ -22,11 +24,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.dashboard.entrypoints=traefik"
       - "traefik.http.routers.dashboard.rule=Host(`painel.docker.localhost`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"      
+      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"
       - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
+
 
   app1:
     build: ./app1
