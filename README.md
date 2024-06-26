@@ -211,6 +211,7 @@ E você poderá criar arquivo por arquivo para treinar.
 ```
 
 ### Explicação das Configurações do Traefik
+
     [entryPoints]: 
         Define os pontos de entrada do Traefik. Aqui, configuramos duas portas:
     
@@ -234,6 +235,67 @@ E você poderá criar arquivo por arquivo para treinar.
         storage = "acme.json": Arquivo de armazenamento para certificados ACME.
         tlsChallenge: Configura o desafio TLS para a obtenção de certificados SSL.
         entryPoint = "websecure": Usa o ponto de entrada websecure para o desafio TLS.
+
+
+## Explicação das Configurações de Log no Traefik
+As configurações de log no Traefik permitem que você controle como as mensagens de 
+log são geradas e armazenadas. Existem dois tipos principais de logs que você pode 
+configurar: 
+
+* logs de execução 
+* e logs de acesso.
+
+- Logs de Execução: Registram eventos operacionais do Traefik, como inicialização, configuração de roteadores, resoluções de certificados, etc.
+
+- Logs de Acesso: Registram cada requisição HTTP processada pelo Traefik, incluindo informações sobre as requisições e respostas.
+  
+Configurações de Logs de Execução
+  level: Define o nível de log. Pode ser DEBUG, INFO, WARN, ERROR, FATAL, PANIC.
+  filePath: Especifica o caminho do arquivo onde os logs serão armazenados.
+  format: Define o formato dos logs. Pode ser json ou common.
+  
+Configurações de Logs de Acesso
+  filePath: Especifica o caminho do arquivo onde os logs de acesso serão armazenados.
+  bufferingSize: Define o tamanho do buffer para os logs de acesso. Isso pode melhorar o desempenho ao reduzir a frequência de gravação no disco.
+  Atualizando traefik.dev.toml com Configurações de Log
+
+Aqui está como você pode adicionar essas configurações ao seu arquivo traefik.dev.toml:
+
+>> traefik.dev.toml
+
+```toml
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+  [entryPoints.websecure]
+    address = ":443"
+
+[api]
+  insecure = true
+  dashboard = true
+
+[log]
+  level = "DEBUG"
+  filePath = "log-file.log"
+  format = "common"
+
+[accessLog]
+  filePath = "log-access.log"
+  bufferingSize = 100
+
+[providers]
+  [providers.docker]
+    exposedByDefault = false
+    network = "web"
+
+[certificatesResolvers.myresolver.acme]
+  email = "admin@mail.com"
+  storage = "acme.json"
+  [certificatesResolvers.myresolver.acme.tlsChallenge]
+    entryPoint = "websecure"
+
+```
+        
 
 ### Configuração do `docker-compose-dev.yml`
 
@@ -443,6 +505,7 @@ No macOS ou Linux:
 Adicione as seguintes linhas:
 
 ```s
+127.0.0.1 painel.docker.localhost
 127.0.0.1 app1.docker.localhost
 127.0.0.1 app2.docker.localhost
 ```

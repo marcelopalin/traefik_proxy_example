@@ -9,7 +9,14 @@
   [entryPoints.websecure]
     address = ":443"
 
+[log]
+  level = "WARN"
+  filePath = "log-file.log"
+  format = "json"
+
 [accessLog]
+  filePath = "log-access.log"
+  bufferingSize = 100
 
 [api]
   dashboard = true

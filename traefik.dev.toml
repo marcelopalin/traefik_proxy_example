@@ -3,23 +3,34 @@
     address = ":80"
   [entryPoints.websecure]
     address = ":443"
+  [entryPoints.traefik]
+    address = ":8080"
 
 [api]
-  insecure = true
+  insecure = true  # Ajustado para true para permitir o acesso sem autenticação durante o desenvolvimento
   dashboard = true
 
 [log]
   level = "DEBUG"
+  filePath = "log-file.log"
+  format = "common"
 
 [accessLog]
+  filePath = "log-access.log"
+  bufferingSize = 100
 
 [providers]
   [providers.docker]
     exposedByDefault = false
     network = "web"
 
-[certificatesResolvers.myresolver.acme]
-  email = "admin@mail.com"
-  storage = "acme.json"
-  [certificatesResolvers.myresolver.acme.tlsChallenge]
-    entryPoint = "websecure"
+[tls]
+  [[tls.certificates]]
+    certFile = "./cert/docker.localhost.pem"
+    keyFile = "./cert/docker.localhost-key.pem"
+
+[http.routers.api]
+  rule = "Host(`painel.docker.localhost`)"
+  entryPoints = ["traefik"]
+  service = "api@internal"
+

@@ -1,25 +1,32 @@
+networks:
+  web:
+    external: true
+
 services:
   traefik:
     image: traefik:v2.9
     command:
-      - "--configFile=/etc/traefik/traefik.toml"
-      - "--entryPoints.web.address=:80"
-      - "--entryPoints.websecure.address=:443"
+      - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--certificatesresolvers.myresolver.acme.email=admin@mail.com"
-      - "--certificatesresolvers.myresolver.acme.storage=acme.json"
-      - "--certificatesresolvers.myresolver.acme.tlsChallenge=true"
     volumes:
-      - "./traefik.dev.toml:/etc/traefik/traefik.toml"
+      - "./traefik.dev.toml:/etc/traefik/traefik.toml:ro"
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./cert:/cert"
+      - "./cert:/cert:ro"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.dashboard.entrypoints=traefik"
+      - "traefik.http.routers.dashboard.rule=Host(`painel.docker.localhost`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"      
+      - "traefik.http.routers.dashboard.service=api@internal"
 
   app1:
     build: ./app1
@@ -28,6 +35,7 @@ services:
       - ./app1:/app
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.app1.rule=Host(`app1.docker.localhost`)"
       - "traefik.http.routers.app1.entrypoints=websecure"
       - "traefik.http.routers.app1.tls.certresolver=myresolver"
@@ -42,13 +50,10 @@ services:
       - ./app2:/app
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.app2.rule=Host(`app2.docker.localhost`)"
       - "traefik.http.routers.app2.entrypoints=websecure"
       - "traefik.http.routers.app2.tls.certresolver=myresolver"
       - "traefik.http.services.app2.loadbalancer.server.port=8001"
     networks:
       - web
-
-networks:
-  web:
-    driver: bridge
