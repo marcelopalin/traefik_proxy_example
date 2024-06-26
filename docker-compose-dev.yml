@@ -1,0 +1,47 @@
+services:
+  traefik:
+    image: traefik:v2.9
+    command:
+      - "--configFile=/etc/traefik/traefik.toml"
+    volumes:
+      - "./traefik.dev.toml:/etc/traefik/traefik.toml"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    networks:
+      - web
+
+  app1:
+    build: ./app1
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./app1:/app
+    ports:
+      - "8000:8000"
+    labels:
+      - "traefik.enable=true" 
+      - "traefik.http.routers.app1.rule=Host(`app1.localhost`)"
+      - "traefik.http.services.app1.loadbalancer.server.port=8000"
+      - "traefik.http.routers.app1.entrypoints=web"
+    networks:
+      - web
+
+  app2:
+    build: ./app2
+    command: uvicorn main:app --host 0.0.0.0 --port 8001
+    volumes:
+      - ./app2:/app
+    ports:
+      - "8001:8001"
+    labels:
+      - "traefik.enable=true" 
+      - "traefik.http.routers.app2.rule=Host(`app2.localhost`)"
+      - "traefik.http.routers.app2.entrypoints=web"
+      - "traefik.http.services.app2.loadbalancer.server.port=8001"
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge
